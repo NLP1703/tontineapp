@@ -1,0 +1,15 @@
+:root {
+  --brand-blue: #0D47A1;
+  --brand-orange: #E65100;
+  --glass-bg: rgba(255, 255, 255, 0.08);
+}
+
+.glass {
+  background: var(--glass-bg);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+
+
