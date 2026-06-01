@@ -1,0 +1,14 @@
+# Point d'entrée externe du cluster : expose l'API Gateway.
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: tontineapp
+spec:
+  type: LoadBalancer
+  selector:
+    app: gateway
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80

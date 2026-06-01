@@ -1,0 +1,8 @@
+# Provisioning Grafana : charge automatiquement les dashboards du dossier.
+apiVersion: 1
+providers:
+  - name: TontineApp
+    folder: TontineApp
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards

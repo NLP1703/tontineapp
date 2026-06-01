@@ -1,0 +1,48 @@
+# Services ClusterIP : service discovery interne par nom DNS.
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  namespace: tontineapp
+spec:
+  selector:
+    app: auth-service
+  ports:
+    - port: 3001
+      targetPort: 3001
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tontine-service
+  namespace: tontineapp
+spec:
+  selector:
+    app: tontine-service
+  ports:
+    - port: 3002
+      targetPort: 3002
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+  namespace: tontineapp
+spec:
+  selector:
+    app: notification-service
+  ports:
+    - port: 3003
+      targetPort: 3003
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: tontineapp
+spec:
+  selector:
+    app: frontend
+  ports:
+    - port: 80
+      targetPort: 80

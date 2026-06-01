@@ -1,0 +1,37 @@
+# Config Nginx de l'API Gateway dans le cluster (DNS internes Kubernetes).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gateway-config
+  namespace: tontineapp
+data:
+  default.conf: |
+    upstream auth_service         { server auth-service:3001; }
+    upstream tontine_service      { server tontine-service:3002; }
+    upstream notification_service { server notification-service:3003; }
+    upstream frontend_app         { server frontend:80; }
+
+    map $http_upgrade $connection_upgrade {
+      default upgrade;
+      ''      close;
+    }
+
+    server {
+      listen 80;
+      server_name _;
+      client_max_body_size 2m;
+
+      location /api/auth/   { proxy_pass http://auth_service; proxy_set_header Host $host; }
+      location /api/groups/ { proxy_pass http://tontine_service; proxy_set_header Host $host; }
+      location /api/notify/ { proxy_pass http://notification_service; proxy_set_header Host $host; }
+
+      location /socket.io/ {
+        proxy_pass http://notification_service;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_set_header Host $host;
+      }
+
+      location / { proxy_pass http://frontend_app; proxy_set_header Host $host; }
+    }

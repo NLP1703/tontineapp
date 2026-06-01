@@ -1,0 +1,14 @@
+# Variables d'environnement non sensibles partagées par les services.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: tontineapp
+data:
+  NODE_ENV: "production"
+  JWT_EXPIRES_IN: "7d"
+  OTP_TTL_MINUTES: "10"
+  POSTGRES_DB: "tontineapp"
+  # Hôte DNS interne du service PostgreSQL.
+  DB_HOST: "postgres"
+  DB_PORT: "5432"

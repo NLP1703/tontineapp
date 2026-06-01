@@ -1,0 +1,69 @@
+# =====================================================================
+# Playbook 2 — Configuration & démarrage des services applicatifs
+# Déploie : config Nginx TontineApp, Prometheus, Grafana (via Docker).
+#   ansible-playbook -i inventory.ini playbook-services.yml
+# =====================================================================
+---
+- name: Configurer les services TontineApp
+  hosts: vps
+  become: true
+
+  vars:
+    app_dir: /opt/tontineapp
+
+  tasks:
+    - name: Créer le répertoire applicatif
+      file:
+        path: "{{ app_dir }}/monitoring"
+        state: directory
+        mode: "0755"
+
+    # ---------------- Nginx (reverse proxy TontineApp) ----------------
+    - name: Déployer la config Nginx TontineApp
+      copy:
+        src: ../../nginx.conf
+        dest: /etc/nginx/sites-available/tontineapp.conf
+        mode: "0644"
+      notify: reload nginx
+
+    - name: Activer le site TontineApp
+      file:
+        src: /etc/nginx/sites-available/tontineapp.conf
+        dest: /etc/nginx/sites-enabled/tontineapp.conf
+        state: link
+      notify: reload nginx
+
+    # ---------------- Monitoring ----------------
+    - name: Déployer la config Prometheus
+      copy:
+        src: ../monitoring/prometheus.yml
+        dest: "{{ app_dir }}/monitoring/prometheus.yml"
+        mode: "0644"
+
+    - name: Lancer Prometheus (conteneur)
+      community.docker.docker_container:
+        name: prometheus
+        image: prom/prometheus:latest
+        state: started
+        restart_policy: unless-stopped
+        ports:
+          - "9090:9090"
+        volumes:
+          - "{{ app_dir }}/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro"
+
+    - name: Lancer Grafana (conteneur)
+      community.docker.docker_container:
+        name: grafana
+        image: grafana/grafana:latest
+        state: started
+        restart_policy: unless-stopped
+        ports:
+          - "3000:3000"
+        env:
+          GF_SECURITY_ADMIN_PASSWORD: "admin"
+
+  handlers:
+    - name: reload nginx
+      service:
+        name: nginx
+        state: reloaded
