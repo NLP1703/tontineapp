@@ -34,3 +34,8 @@ yarn-error.log*
 
 # Misc
 *.tsbuildinfo
+
+# Binaires d'outillage local (k3d téléchargé, etc.)
+.tmp-bin/
+# Config locale Claude / agents
+.claude/

@@ -50,22 +50,28 @@ describe('POST /api/groups', () => {
 describe('POST /api/groups/:id/contribute', () => {
   it('enregistre une cotisation et recalcule le score (201)', async () => {
     query
-      .mockResolvedValueOnce({ rows: [{ id: 'g1', current_cycle: 1 }] }) // findById tontine
+      .mockResolvedValueOnce({ rows: [{ id: 'g1', current_cycle: 1, contribution_amount: '50000', name: 'A' }] }) // findById tontine
       .mockResolvedValueOnce({ rows: [{ '?column?': 1 }] }) // isMember
+      .mockResolvedValueOnce({ rows: [] }) // rubrics du groupe (aucune → cotisation simple)
       .mockResolvedValueOnce({ rows: [{ id: 'p1', amount: '50000', status: 'paid' }] }) // insert payment
-      .mockResolvedValueOnce({ rows: [{ daysLate: 0 }] }) // history
+      .mockResolvedValueOnce({ rows: [{ daysLate: 0 }] }) // historyForMember
       .mockResolvedValueOnce({ rows: [] }) // updateReliability
+      .mockResolvedValueOnce({ rows: [{ id: 'user-1', full_name: 'Alice' }] }) // findManyByIds (payeur)
+      .mockResolvedValueOnce({ rows: [{ user_id: 'user-1' }] }) // listUserIds (notif)
     const res = await request(app)
       .post('/api/groups/g1/contribute')
       .set(auth)
-      .send({ amount: 50000 })
+      .send({ amount: 50000, senderPhone: '650000000', receiverPhone: '651111111' })
     expect(res.status).toBe(201)
     expect(res.body).toHaveProperty('reliabilityScore')
   })
 
   it('refuse de cotiser à un groupe inexistant (404)', async () => {
     query.mockResolvedValueOnce({ rows: [] }) // findById → introuvable
-    const res = await request(app).post('/api/groups/x/contribute').set(auth).send({ amount: 100 })
+    const res = await request(app)
+      .post('/api/groups/x/contribute')
+      .set(auth)
+      .send({ amount: 100, senderPhone: '650000000', receiverPhone: '651111111' })
     expect(res.status).toBe(404)
   })
 })
@@ -73,8 +79,10 @@ describe('POST /api/groups/:id/contribute', () => {
 describe('GET /api/groups/:id', () => {
   it('retourne le groupe et ses membres (200)', async () => {
     query
-      .mockResolvedValueOnce({ rows: [{ id: 'g1', name: 'A' }] }) // findById
-      .mockResolvedValueOnce({ rows: [{ id: 'm1', rotation_order: 1, reliability_score: '100' }] }) // members
+      .mockResolvedValueOnce({ rows: [{ id: 'g1', name: 'A', current_cycle: 1 }] }) // findById
+      .mockResolvedValueOnce({ rows: [{ id: 'm1', user_id: 'user-1', rotation_order: 1, reliability_score: '100' }] }) // members
+      .mockResolvedValueOnce({ rows: [] }) // rubrics
+      .mockResolvedValueOnce({ rows: [] }) // paidUserIdsForCycle (qui a payé ce cycle)
     const res = await request(app).get('/api/groups/g1').set(auth)
     expect(res.status).toBe(200)
     expect(res.body.members).toHaveLength(1)
