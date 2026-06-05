@@ -15,6 +15,11 @@ function getTransporter(): Transporter {
     port,
     // STARTTLS opportuniste ; Mailpit accepte le clair sur 1025.
     secure: false,
+    // Timeouts courts : un SMTP injoignable ne doit jamais bloquer la requête HTTP
+    // (inscription / connexion) plus de quelques secondes.
+    connectionTimeout: 7000,
+    greetingTimeout: 7000,
+    socketTimeout: 10000,
     ...(user && pass ? { auth: { user, pass } } : {}),
   });
   return transporter;

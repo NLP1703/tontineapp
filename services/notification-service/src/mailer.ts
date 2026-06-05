@@ -11,6 +11,10 @@ function getTransporter(): Transporter {
     host: process.env.SMTP_HOST || 'mailpit',
     port: Number(process.env.SMTP_PORT || 1025),
     secure: false,
+    // Timeouts courts : un SMTP injoignable ne doit jamais bloquer l'appelant.
+    connectionTimeout: 7000,
+    greetingTimeout: 7000,
+    socketTimeout: 10000,
     ...(process.env.SMTP_USER && process.env.SMTP_PASS
       ? { auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } }
       : {}),

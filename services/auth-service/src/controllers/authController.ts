@@ -37,7 +37,9 @@ async function issueOtp(
     purpose === 'signup'
       ? `Bonjour ${fullName}, confirmez votre adresse email avec le code ci-dessous.`
       : `Bonjour ${fullName}, utilisez ce code pour réinitialiser votre mot de passe.`;
-  await sendMail(
+  // Envoi en arrière-plan : la réponse HTTP (inscription/connexion) ne doit jamais
+  // attendre le SMTP. Le code OTP est déjà persisté ci-dessus. sendMail logue ses erreurs.
+  void sendMail(
     email,
     subject,
     `${intro}\n\nCode : ${otp}\n\nIl expire dans ${ttlMinutes} minutes.`,

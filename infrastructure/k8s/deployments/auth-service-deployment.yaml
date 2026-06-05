@@ -34,14 +34,11 @@ spec:
               valueFrom: { secretKeyRef: { name: app-secrets, key: DATABASE_URL } }
             - name: JWT_SECRET
               valueFrom: { secretKeyRef: { name: app-secrets, key: JWT_SECRET } }
+            # SMTP -> Mailpit (boîte mail locale du cluster). Pas d'authentification.
             - name: SMTP_HOST
-              value: "smtp.gmail.com"
+              value: "mailpit"
             - name: SMTP_PORT
-              value: "587"
-            - name: SMTP_USER
-              valueFrom: { secretKeyRef: { name: app-secrets, key: SMTP_USER } }
-            - name: SMTP_PASS
-              valueFrom: { secretKeyRef: { name: app-secrets, key: SMTP_PASS } }
+              value: "1025"
             - name: SMTP_FROM
               valueFrom: { secretKeyRef: { name: app-secrets, key: SMTP_FROM } }
           readinessProbe:

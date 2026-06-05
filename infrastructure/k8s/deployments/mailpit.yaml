@@ -1,0 +1,53 @@
+# Mailpit : serveur SMTP de développement + boîte de réception web.
+# Les services envoient les OTP/notifications vers mailpit:1025 (SMTP) ;
+# on lit les emails reçus dans l'interface web (exposée via le gateway sur /mailpit/).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mailpit
+  namespace: tontineapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mailpit
+  template:
+    metadata:
+      labels:
+        app: mailpit
+    spec:
+      containers:
+        - name: mailpit
+          image: axllent/mailpit:latest
+          env:
+            # Sert l'interface web sous le préfixe /mailpit/ (derrière le gateway).
+            - name: MP_WEBROOT
+              value: "mailpit"
+          ports:
+            - name: smtp
+              containerPort: 1025
+            - name: ui
+              containerPort: 8025
+          readinessProbe:
+            tcpSocket: { port: 8025 }
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          resources:
+            requests: { cpu: "20m", memory: "32Mi" }
+            limits: { cpu: "100m", memory: "128Mi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mailpit
+  namespace: tontineapp
+spec:
+  selector:
+    app: mailpit
+  ports:
+    - name: smtp
+      port: 1025
+      targetPort: 1025
+    - name: ui
+      port: 8025
+      targetPort: 8025

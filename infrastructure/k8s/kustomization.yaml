@@ -25,5 +25,10 @@ resources:
   - deployments/notification-service-deployment.yaml
   - deployments/frontend-deployment.yaml
   - deployments/gateway-deployment.yaml
+  # Boîte mail locale (OTP / notifications en développement)
+  - deployments/mailpit.yaml
+  # Monitoring
+  - monitoring/prometheus.yaml
+  - monitoring/grafana.yaml
   # Mise à l'échelle automatique
   - hpa/tontine-hpa.yaml
