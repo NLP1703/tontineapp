@@ -1,0 +1,25 @@
+# Définition du cluster local k3d (= K3s dans Docker).
+# K3s est la distribution Kubernetes déjà utilisée en prod par ce projet
+# (cf. infrastructure/ansible/playbook-install.yml). k3d en est l'équivalent
+# local : un cluster jetable pour développer et tester les manifestes.
+#
+#   Création : k3d cluster create --config infrastructure/k8s/cluster/k3d-cluster.yaml
+#   Suppression : k3d cluster delete tontineapp
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: tontineapp
+servers: 1            # 1 noeud control-plane
+agents: 1             # 1 noeud worker (pour répartir les replicas)
+ports:
+  # Expose l'API Gateway (Service LoadBalancer "gateway") sur http://localhost:8080
+  - port: 8080:80
+    nodeFilters:
+      - loadbalancer
+options:
+  k3s:
+    extraArgs:
+      # On désactive Traefik : ce projet a sa propre gateway Nginx.
+      - arg: --disable=traefik
+        nodeFilters:
+          - server:*

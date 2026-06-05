@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
 
 import groupsRoutes from './routes/groups.js';
+import subscriptionRoutes from './routes/subscription.js';
 import { metricsMiddleware, metricsHandler } from './metrics.js';
 import { swaggerSpec } from './swagger.js';
 
@@ -20,6 +21,7 @@ export function createApp() {
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
   app.use('/api/groups', groupsRoutes);
+  app.use('/api/subscription', subscriptionRoutes);
 
   return app;
 }

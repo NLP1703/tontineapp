@@ -6,6 +6,8 @@ import * as Members from '../models/member.js';
 import * as Rubrics from '../models/rubric.js';
 import * as Payments from '../models/payment.js';
 import * as Users from '../models/user.js';
+import * as Subscriptions from '../models/subscription.js';
+import { getPlan } from '../config/plans.js';
 import { emitNotification, emitToMany } from '../notify.js';
 import { computeNextDeadline } from '../algorithms/schedule.js';
 
@@ -114,6 +116,20 @@ export async function addMember(req: Request, res: Response) {
 
   if (await Members.isMember(tontine.id, user.id)) {
     return res.status(409).json({ error: 'Cette personne est déjà membre du groupe' });
+  }
+
+  // Limite Freemium : le plan du propriétaire borne le nombre de membres du groupe.
+  const ownerPlan = getPlan(await Subscriptions.getPlanId(tontine.owner_user_id));
+  if (ownerPlan.maxMembersPerGroup !== null) {
+    const memberCount = await Members.count(tontine.id);
+    if (memberCount >= ownerPlan.maxMembersPerGroup) {
+      return res.status(402).json({
+        error: `Limite du plan ${ownerPlan.label} atteinte (${ownerPlan.maxMembersPerGroup} membres). Passez à un plan supérieur pour ajouter davantage de membres.`,
+        code: 'PLAN_LIMIT_REACHED',
+        plan: ownerPlan.id,
+        limit: ownerPlan.maxMembersPerGroup,
+      });
+    }
   }
 
   const member = await Members.add(tontine.id, user.id);

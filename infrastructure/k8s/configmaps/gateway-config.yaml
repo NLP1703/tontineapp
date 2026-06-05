@@ -21,9 +21,10 @@ data:
       server_name _;
       client_max_body_size 2m;
 
-      location /api/auth/   { proxy_pass http://auth_service; proxy_set_header Host $host; }
-      location /api/groups/ { proxy_pass http://tontine_service; proxy_set_header Host $host; }
-      location /api/notify/ { proxy_pass http://notification_service; proxy_set_header Host $host; }
+      location /api/auth/         { proxy_pass http://auth_service; proxy_set_header Host $host; }
+      location /api/groups/       { proxy_pass http://tontine_service; proxy_set_header Host $host; }
+      location /api/subscription  { proxy_pass http://tontine_service; proxy_set_header Host $host; }
+      location /api/notify/       { proxy_pass http://notification_service; proxy_set_header Host $host; }
 
       location /socket.io/ {
         proxy_pass http://notification_service;

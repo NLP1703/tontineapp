@@ -110,3 +110,19 @@ CREATE TABLE IF NOT EXISTS activities (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_activities_user ON activities(user_id);
+
+-- ---------------------------------------------------------------------
+-- Abonnements Freemium — géré par tontine-service (cf. migration 006)
+-- Le plan du propriétaire d'un groupe limite le nombre de membres :
+-- free = 10, standard = 30, premium = illimité.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS subscriptions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  plan TEXT NOT NULL DEFAULT 'free',           -- free | standard | premium
+  status TEXT NOT NULL DEFAULT 'active',       -- active | cancelled | expired
+  started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expires_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(user_id);

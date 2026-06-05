@@ -18,6 +18,7 @@ spec:
       containers:
         - name: frontend
           image: tontineapp/frontend:latest
+          imagePullPolicy: IfNotPresent   # utilise l'image locale si déjà présente sur le node
           ports:
             - containerPort: 80
           readinessProbe:

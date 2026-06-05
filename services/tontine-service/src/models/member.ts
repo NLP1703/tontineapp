@@ -35,6 +35,15 @@ export async function listUserIds(tontineId: string): Promise<string[]> {
   return res.rows.map((r) => r.user_id as string);
 }
 
+// Nombre de membres d'un groupe (utilisé pour la limite du plan Freemium).
+export async function count(tontineId: string): Promise<number> {
+  const res = await pool.query(
+    `SELECT COUNT(*)::int AS n FROM tontine_members WHERE tontine_id = $1`,
+    [tontineId]
+  );
+  return res.rows[0]?.n ?? 0;
+}
+
 export async function isMember(tontineId: string, userId: string): Promise<boolean> {
   const res = await pool.query(
     `SELECT 1 FROM tontine_members WHERE tontine_id = $1 AND user_id = $2`,
