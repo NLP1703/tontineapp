@@ -9,6 +9,7 @@ import DashboardPage from './pages/DashboardPage'
 import GroupsPage from './pages/groups/GroupsPage'
 import GroupDetailsPage from './pages/groups/GroupDetailsPage'
 import ProfilePage from './pages/ProfilePage'
+import SubscriptionPage from './pages/SubscriptionPage'
 import PaymentsPage from './pages/PaymentsPage'
 import NotificationsPage from './pages/NotificationsPage'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -33,6 +34,7 @@ export default function App() {
         <Route path="/groups/:id" element={<GroupDetailsPage />} />
         <Route path="/payments" element={<PaymentsPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
+        <Route path="/subscription" element={<SubscriptionPage />} />
         <Route path="/profile" element={<ProfilePage />} />
       </Route>
 

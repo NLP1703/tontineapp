@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, Users, Wallet, Bell, User as UserIcon, LogOut } from 'lucide-react'
+import { LayoutDashboard, Users, Wallet, Bell, Crown, User as UserIcon, LogOut } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { cn } from '../utils/cn'
 import NotificationsListener from './NotificationsListener'
@@ -9,6 +9,7 @@ const links = [
   { to: '/groups', label: 'Groupes', icon: Users },
   { to: '/payments', label: 'Paiements', icon: Wallet },
   { to: '/notifications', label: 'Notifications', icon: Bell },
+  { to: '/subscription', label: 'Abonnement', icon: Crown },
   { to: '/profile', label: 'Profil', icon: UserIcon },
 ]
 
