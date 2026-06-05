@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
 import { ArrowRight, Check } from 'lucide-react'
+import ServicesMarquee from '../components/ServicesMarquee'
 
 const stats = [
   { label: 'Tontines gérées', value: 1284 },
@@ -25,6 +26,7 @@ export default function LandingPage() {
             </div>
 
             <nav className="hidden md:flex items-center gap-6 text-sm text-slate-600">
+              <a className="hover:text-slate-900" href="#services">Services</a>
               <a className="hover:text-slate-900" href="#features">Fonctionnalités</a>
               <a className="hover:text-slate-900" href="#testimonials">Témoignages</a>
               <a className="hover:text-slate-900" href="#pricing">Avantages</a>
@@ -156,6 +158,9 @@ export default function LandingPage() {
           ))}
         </div>
       </section>
+
+      {/* Services (carrousel horizontal défilant) */}
+      <ServicesMarquee />
 
       {/* Features */}
       <section id="features" className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-16">
