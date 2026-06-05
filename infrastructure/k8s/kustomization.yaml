@@ -1,0 +1,29 @@
+# Agrège tous les manifestes du cluster pour un déploiement en une commande :
+#   kubectl apply -k infrastructure/k8s
+# Kustomize ordonne automatiquement (namespace -> config/secrets -> workloads).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: tontineapp
+
+resources:
+  - namespace.yaml
+  # Configuration & secrets (créés avant les workloads qui les consomment)
+  - configmaps/app-config.yaml
+  - configmaps/gateway-config.yaml
+  - configmaps/postgres-init.yaml
+  - secrets/app-secrets.yaml
+  # Données persistantes
+  - statefulsets/postgres.yaml
+  - statefulsets/redis.yaml
+  # Services (service discovery interne + point d'entrée externe)
+  - services/app-services.yaml
+  - services/gateway-service.yaml
+  # Workloads applicatifs
+  - deployments/auth-service-deployment.yaml
+  - deployments/tontine-service-deployment.yaml
+  - deployments/notification-service-deployment.yaml
+  - deployments/frontend-deployment.yaml
+  - deployments/gateway-deployment.yaml
+  # Mise à l'échelle automatique
+  - hpa/tontine-hpa.yaml
