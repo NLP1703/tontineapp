@@ -93,21 +93,40 @@ export async function paidUserIdsForCycle(
   return res.rows.map((r) => r.user_id as string);
 }
 
-// Récapitulatif des cotisations personnelles d'un utilisateur, tous groupes confondus :
-// total cumulé + ventilation par mois (6 derniers mois) + total cotisé par tontine.
-// Sert à alimenter le tableau de bord en données RÉELLES (et non plus en valeurs configurées).
+// Récapitulatif RÉEL du tableau de bord d'un utilisateur. Deux points de vue :
+//  - cagnotte : total des cotisations de TOUS les membres dans les groupes de
+//    l'utilisateur (propriétaire OU membre). C'est ce qui « bouge » dès qu'un
+//    membre cotise → le tableau de bord reflète l'activité réelle des groupes.
+//  - perso : ce que l'utilisateur a personnellement cotisé.
+// Inclut la ventilation mensuelle (6 derniers mois) et le détail par groupe de la cagnotte.
 export async function userContributionSummary(userId: string): Promise<{
+  // Cagnotte cumulée de tous les groupes de l'utilisateur (toutes cotisations, tous membres).
+  totalPot: number;
+  // Cotisations personnelles de l'utilisateur, tous groupes confondus.
   totalContributed: number;
+  // Série mensuelle de la cagnotte (tous groupes) sur les 6 derniers mois.
   monthly: { month: string; amount: number }[];
+  // tontineId -> cagnotte du groupe (total cotisé par tous les membres).
   perGroup: Record<string, number>;
 }> {
-  const [totalRes, monthlyRes, perGroupRes] = await Promise.all([
+  // Sous-requête : identifiants des tontines où l'utilisateur est propriétaire ou membre.
+  const myTontines = `
+    SELECT t.id FROM tontines t
+    LEFT JOIN tontine_members m ON m.tontine_id = t.id
+    WHERE t.owner_user_id = $1 OR m.user_id = $1`;
+
+  const [potRes, mineRes, monthlyRes, perGroupRes] = await Promise.all([
+    pool.query(
+      `SELECT COALESCE(SUM(amount), 0) AS total
+       FROM payments WHERE tontine_id IN (${myTontines})`,
+      [userId]
+    ),
     pool.query(`SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE user_id = $1`, [userId]),
     pool.query(
       `SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') AS month,
               COALESCE(SUM(amount), 0) AS amount
        FROM payments
-       WHERE user_id = $1
+       WHERE tontine_id IN (${myTontines})
          AND created_at >= date_trunc('month', NOW()) - INTERVAL '5 months'
        GROUP BY 1
        ORDER BY 1`,
@@ -115,7 +134,7 @@ export async function userContributionSummary(userId: string): Promise<{
     ),
     pool.query(
       `SELECT tontine_id, COALESCE(SUM(amount), 0) AS amount
-       FROM payments WHERE user_id = $1 GROUP BY tontine_id`,
+       FROM payments WHERE tontine_id IN (${myTontines}) GROUP BY tontine_id`,
       [userId]
     ),
   ]);
@@ -124,7 +143,8 @@ export async function userContributionSummary(userId: string): Promise<{
   for (const r of perGroupRes.rows) perGroup[r.tontine_id as string] = Number(r.amount);
 
   return {
-    totalContributed: Number(totalRes.rows[0].total),
+    totalPot: Number(potRes.rows[0].total),
+    totalContributed: Number(mineRes.rows[0].total),
     monthly: monthlyRes.rows.map((r) => ({ month: r.month as string, amount: Number(r.amount) })),
     perGroup,
   };

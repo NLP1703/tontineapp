@@ -45,6 +45,7 @@ export async function summary(req: Request, res: Response) {
 
   return res.json({
     groups,
+    totalPot: contrib.totalPot,
     totalContributed: contrib.totalContributed,
     perGroup: contrib.perGroup,
     series,

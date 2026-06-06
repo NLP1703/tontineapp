@@ -18,7 +18,7 @@ import { apiError } from '../services/api'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, Filler)
 
-const EMPTY: DashboardSummary = { groups: [], totalContributed: 0, perGroup: {}, series: [] }
+const EMPTY: DashboardSummary = { groups: [], totalPot: 0, totalContributed: 0, perGroup: {}, series: [] }
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user)
@@ -42,14 +42,10 @@ export default function DashboardPage() {
   // ajout/retrait de membre…) et au retour de focus : les chiffres reflètent le réel.
   useRealtimeRefresh(load)
 
-  const { groups, totalContributed, perGroup, series } = data
+  const { groups, totalPot, totalContributed, perGroup, series } = data
 
   const activeCount = useMemo(
     () => groups.filter((g) => g.status === 'active').length,
-    [groups],
-  )
-  const avgCycle = useMemo(
-    () => (groups.length ? Math.round(groups.reduce((a, g) => a + g.current_cycle, 0) / groups.length) : 0),
     [groups],
   )
 
@@ -84,16 +80,16 @@ export default function DashboardPage() {
         {error && <div className="mt-4 rounded-xl bg-red-50 ring-1 ring-red-200 px-4 py-3 text-sm text-red-700">{error}</div>}
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <GlassCard title="Total cotisé" value={`${totalContributed.toLocaleString()} CFA`} />
+          <GlassCard title="Cagnotte de mes groupes" value={`${totalPot.toLocaleString()} CFA`} />
+          <GlassCard title="Mes cotisations" value={`${totalContributed.toLocaleString()} CFA`} accent="orange" />
           <GlassCard title="Tontines actives" value={String(activeCount)} />
-          <GlassCard title="Mes groupes" value={String(groups.length)} accent="orange" />
-          <GlassCard title="Cycle moyen" value={String(avgCycle)} />
+          <GlassCard title="Mes groupes" value={String(groups.length)} />
         </div>
 
         <div className="mt-6 grid gap-4 lg:grid-cols-3">
           <div className="lg:col-span-2 rounded-2xl glass ring-1 ring-white/20 p-5 sm:p-6">
             <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold text-slate-900">Évolution de mes cotisations</div>
+              <div className="text-sm font-semibold text-slate-900">Évolution des cotisations</div>
               <div className="text-xs text-slate-500">6 derniers mois</div>
             </div>
             <div className="mt-4">
@@ -120,7 +116,7 @@ export default function DashboardPage() {
                     )}
                   </div>
                   <div className="text-xs text-slate-600 mt-1">
-                    {(perGroup[g.id] ?? 0).toLocaleString()} CFA cotisés · {g.frequency}
+                    Cagnotte {(perGroup[g.id] ?? 0).toLocaleString()} CFA · {g.frequency}
                   </div>
                 </div>
               ))}

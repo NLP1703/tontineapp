@@ -68,8 +68,11 @@ export async function listGroups() {
 // effectivement cotisé, détail par groupe et série mensuelle (6 derniers mois).
 export interface DashboardSummary {
   groups: Group[]
+  // Cagnotte cumulée de tous les groupes de l'utilisateur (cotisations de tous les membres).
+  totalPot: number
+  // Cotisations personnelles de l'utilisateur, tous groupes confondus.
   totalContributed: number
-  // tontineId -> montant réellement cotisé par l'utilisateur dans ce groupe
+  // tontineId -> cagnotte du groupe (total cotisé par tous les membres)
   perGroup: Record<string, number>
   series: Array<{ label: string; amount: number }>
 }
