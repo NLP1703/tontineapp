@@ -22,6 +22,9 @@ data:
         static_configs:
           - targets: ['notification-service:3003']
       - job_name: 'prometheus'
+        # Prometheus tourne sous --web.route-prefix=/prometheus/ : ses propres
+        # métriques sont exposées sur /prometheus/metrics (et non /metrics).
+        metrics_path: /prometheus/metrics
         static_configs:
           - targets: ['localhost:9090']
   alert-rules.yml: |
