@@ -30,11 +30,16 @@ spec:
               valueFrom: { secretKeyRef: { name: app-secrets, key: DATABASE_URL } }
             - name: JWT_SECRET
               valueFrom: { secretKeyRef: { name: app-secrets, key: JWT_SECRET } }
-            # SMTP -> Mailpit (boîte mail locale du cluster). Pas d'authentification.
+            # SMTP : hôte/port via la ConfigMap (Gmail par défaut), identifiants via le Secret.
+            # Pour revenir à Mailpit (dev), repasser SMTP_HOST=mailpit / SMTP_PORT=1025 dans app-config.
             - name: SMTP_HOST
-              value: "mailpit"
+              valueFrom: { configMapKeyRef: { name: app-config, key: SMTP_HOST } }
             - name: SMTP_PORT
-              value: "1025"
+              valueFrom: { configMapKeyRef: { name: app-config, key: SMTP_PORT } }
+            - name: SMTP_USER
+              valueFrom: { secretKeyRef: { name: app-secrets, key: SMTP_USER } }
+            - name: SMTP_PASS
+              valueFrom: { secretKeyRef: { name: app-secrets, key: SMTP_PASS } }
             - name: SMTP_FROM
               valueFrom: { secretKeyRef: { name: app-secrets, key: SMTP_FROM } }
             - name: NOTIFICATION_URL

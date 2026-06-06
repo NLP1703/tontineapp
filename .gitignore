@@ -34,6 +34,8 @@ yarn-error.log*
 
 # Misc
 *.tsbuildinfo
+# Archive de code générée pour le déploiement VPS (scp), pas un livrable git
+tontineapp-src.tar.gz
 
 # Binaires d'outillage local (k3d téléchargé, etc.)
 .tmp-bin/

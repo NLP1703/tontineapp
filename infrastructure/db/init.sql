@@ -35,6 +35,21 @@ CREATE TABLE IF NOT EXISTS otps (
 CREATE INDEX IF NOT EXISTS idx_otps_user ON otps(user_id);
 
 -- ---------------------------------------------------------------------
+-- Inscriptions en attente de vérification OTP (cf. migration 007)
+-- Tant que l'OTP n'est pas validé, l'utilisateur n'existe pas dans `users`.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS pending_registrations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  full_name TEXT NOT NULL,
+  email TEXT NOT NULL UNIQUE,
+  phone TEXT,
+  password_hash TEXT NOT NULL,
+  otp_code TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ---------------------------------------------------------------------
 -- Tontines (groupes) — géré par tontine-service
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS tontines (
@@ -46,6 +61,7 @@ CREATE TABLE IF NOT EXISTS tontines (
   frequency TEXT NOT NULL DEFAULT 'monthly',  -- monthly | weekly | biweekly
   current_cycle INT NOT NULL DEFAULT 1,
   status TEXT NOT NULL DEFAULT 'active',       -- active | completed | paused
+  max_members INT,                            -- capacité choisie (cf. migration 008) ; NULL = plafond du plan seul
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_tontines_owner ON tontines(owner_user_id);

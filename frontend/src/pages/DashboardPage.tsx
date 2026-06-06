@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Line } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
@@ -13,6 +13,7 @@ import {
 import { GlassCard } from '../ui/GlassCard'
 import { listGroups, type Group } from '../services/groups'
 import { useAuthStore } from '../stores/authStore'
+import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh'
 import { apiError } from '../services/api'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, Filler)
@@ -22,11 +23,21 @@ export default function DashboardPage() {
   const [groups, setGroups] = useState<Group[]>([])
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
+  const load = useCallback(() => {
     listGroups()
-      .then(setGroups)
+      .then((g) => {
+        setGroups(g)
+        setError(null)
+      })
       .catch((err) => setError(apiError(err, 'Chargement impossible')))
   }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  // Rafraîchit le tableau de bord à chaque événement temps réel et au retour de focus.
+  useRealtimeRefresh(load)
 
   const totalContribution = useMemo(
     () => groups.reduce((acc, g) => acc + Number(g.contribution_amount), 0),

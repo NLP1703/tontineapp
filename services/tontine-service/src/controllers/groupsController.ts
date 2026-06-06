@@ -30,6 +30,8 @@ const createSchema = z.object({
   frequency: z.enum(['monthly', 'weekly', 'biweekly']).default('monthly'),
   // Jour récurrent de cotisation : 1..28 (jour du mois) ou 1..7 (jour de semaine).
   paymentDay: z.number().int().min(1).max(31).nullable().optional(),
+  // Nombre de participants souhaité (capacité du groupe). Borné par le plan du propriétaire.
+  maxMembers: z.number().int().min(1).max(1000).nullable().optional(),
   rubrics: z
     .array(
       z.object({
@@ -46,8 +48,26 @@ export async function create(req: Request, res: Response) {
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
-  const { name, description, contributionAmount, frequency, rubrics, paymentDay } = parsed.data;
+  const { name, description, contributionAmount, frequency, rubrics, paymentDay, maxMembers } =
+    parsed.data;
   const owner = userId(req);
+
+  // Capacité bornée par le plan du propriétaire (Gratuit = 10, Standard = 30, Premium = illimité).
+  const ownerPlan = getPlan(await Subscriptions.getPlanId(owner));
+  const planLimit = ownerPlan.maxMembersPerGroup; // null = illimité
+  let capacity = maxMembers ?? null;
+  if (planLimit !== null) {
+    // Plan limité : la capacité par défaut = limite du plan ; le choix ne peut pas la dépasser.
+    if (capacity === null) capacity = planLimit;
+    if (capacity > planLimit) {
+      return res.status(402).json({
+        error: `Le plan ${ownerPlan.label} autorise au maximum ${planLimit} participants par groupe. Passez à un plan supérieur pour en accueillir davantage.`,
+        code: 'PLAN_LIMIT_REACHED',
+        plan: ownerPlan.id,
+        limit: planLimit,
+      });
+    }
+  }
 
   let tontine = await Tontines.create(
     owner,
@@ -55,7 +75,8 @@ export async function create(req: Request, res: Response) {
     description ?? null,
     contributionAmount,
     frequency,
-    paymentDay ?? null
+    paymentDay ?? null,
+    capacity
   );
 
   // Le jour de paiement récurrent génère automatiquement la date limite du cycle.
@@ -87,15 +108,23 @@ export async function details(req: Request, res: Response) {
   const tontine = await Tontines.findById(req.params.id);
   if (!tontine) return res.status(404).json({ error: 'Group not found' });
 
-  const [members, rubrics, paidIds] = await Promise.all([
+  const [members, rubrics, paidIds, totals] = await Promise.all([
     Members.listByTontine(tontine.id),
     Rubrics.listByTontine(tontine.id),
     Payments.paidUserIdsForCycle(tontine.id, tontine.current_cycle),
+    Payments.totalsForTontine(tontine.id, tontine.current_cycle),
   ]);
   // Marque chaque membre comme ayant cotisé (ou non) pour le cycle courant.
   const paid = new Set(paidIds);
   const membersWithStatus = members.map((m) => ({ ...m, has_paid: paid.has(m.user_id) }));
-  return res.json({ group: tontine, members: membersWithStatus, rubrics });
+
+  // Cagnotte (visible par tous) + capacité du groupe (places restantes).
+  const capacity = {
+    memberCount: members.length,
+    maxMembers: tontine.max_members, // null = pas de plafond propre
+  };
+
+  return res.json({ group: tontine, members: membersWithStatus, rubrics, totals, capacity });
 }
 
 // Ajout d'un membre par email OU numéro de téléphone (réservé au créateur).
@@ -118,18 +147,27 @@ export async function addMember(req: Request, res: Response) {
     return res.status(409).json({ error: 'Cette personne est déjà membre du groupe' });
   }
 
-  // Limite Freemium : le plan du propriétaire borne le nombre de membres du groupe.
+  const memberCount = await Members.count(tontine.id);
+
+  // Capacité propre du groupe (nombre de participants choisi à la création).
+  if (tontine.max_members !== null && memberCount >= tontine.max_members) {
+    return res.status(409).json({
+      error: `Groupe complet : ${tontine.max_members} participants maximum. Augmentez la capacité ou passez à un plan supérieur.`,
+      code: 'GROUP_FULL',
+      limit: tontine.max_members,
+    });
+  }
+
+  // Limite Freemium : le plan du propriétaire borne aussi le nombre de membres (utile si le
+  // plan a été rétrogradé après la création du groupe).
   const ownerPlan = getPlan(await Subscriptions.getPlanId(tontine.owner_user_id));
-  if (ownerPlan.maxMembersPerGroup !== null) {
-    const memberCount = await Members.count(tontine.id);
-    if (memberCount >= ownerPlan.maxMembersPerGroup) {
-      return res.status(402).json({
-        error: `Limite du plan ${ownerPlan.label} atteinte (${ownerPlan.maxMembersPerGroup} membres). Passez à un plan supérieur pour ajouter davantage de membres.`,
-        code: 'PLAN_LIMIT_REACHED',
-        plan: ownerPlan.id,
-        limit: ownerPlan.maxMembersPerGroup,
-      });
-    }
+  if (ownerPlan.maxMembersPerGroup !== null && memberCount >= ownerPlan.maxMembersPerGroup) {
+    return res.status(402).json({
+      error: `Limite du plan ${ownerPlan.label} atteinte (${ownerPlan.maxMembersPerGroup} membres). Passez à un plan supérieur pour ajouter davantage de membres.`,
+      code: 'PLAN_LIMIT_REACHED',
+      plan: ownerPlan.id,
+      limit: ownerPlan.maxMembersPerGroup,
+    });
   }
 
   const member = await Members.add(tontine.id, user.id);

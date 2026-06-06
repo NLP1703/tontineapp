@@ -31,8 +31,22 @@ export async function getCurrentSubscription() {
   return data as { plan: Plan; subscription: Subscription | null }
 }
 
-// Change le plan de l'utilisateur (upgrade / downgrade).
+// Change le plan de l'utilisateur (upgrade / downgrade). Utilisé pour les plans gratuits.
 export async function changePlan(plan: PlanId) {
   const { data } = await tontineApi.put('/api/subscription', { plan })
   return data as { plan: Plan; subscription: Subscription }
+}
+
+export interface SimulatedPayment {
+  status: string
+  simulated: boolean
+  reference: string
+  amountFcfa: number
+  phone: string
+}
+
+// Paie (simulation Mobile Money) puis active un plan payant.
+export async function checkoutPlan(plan: PlanId, phone: string) {
+  const { data } = await tontineApi.post('/api/subscription/checkout', { plan, phone })
+  return data as { plan: Plan; subscription: Subscription; payment: SimulatedPayment }
 }

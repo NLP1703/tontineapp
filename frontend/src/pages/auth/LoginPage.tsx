@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { login, requiresOtp } from '../../services/auth'
+import { login } from '../../services/auth'
 import { apiError } from '../../services/api'
 import { useAuthStore } from '../../stores/authStore'
 
@@ -21,12 +21,6 @@ export default function LoginPage() {
       setSession(token, user)
       navigate('/dashboard')
     } catch (err) {
-      // Email non vérifié : un nouveau code OTP vient d'être envoyé → page de vérification.
-      const otp = requiresOtp(err)
-      if (otp) {
-        navigate(`/otp?email=${encodeURIComponent(otp.email || email)}`)
-        return
-      }
       setError(apiError(err, 'Identifiants invalides'))
     } finally {
       setLoading(false)

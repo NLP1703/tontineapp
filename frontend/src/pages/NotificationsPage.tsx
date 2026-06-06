@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Bell, Check } from 'lucide-react'
 import { listNotifications, markNotificationRead, type Notification } from '../services/notifications'
+import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh'
 import { apiError } from '../services/api'
 
 export default function NotificationsPage() {
@@ -8,12 +9,22 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
+  const load = useCallback(() => {
     listNotifications()
-      .then(setItems)
+      .then((n) => {
+        setItems(n)
+        setError(null)
+      })
       .catch((err) => setError(apiError(err, 'Chargement des notifications impossible')))
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  // Affiche les nouvelles notifications dès leur arrivée (temps réel / focus).
+  useRealtimeRefresh(load)
 
   async function onRead(id: string) {
     try {

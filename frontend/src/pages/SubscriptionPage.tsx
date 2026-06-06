@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Check, Crown, Sparkles, Gift, Loader2 } from 'lucide-react'
+import { Check, Crown, Sparkles, Gift, Loader2, Smartphone, X } from 'lucide-react'
 import {
   getPlans,
   getCurrentSubscription,
   changePlan,
+  checkoutPlan,
   type Plan,
   type PlanId,
 } from '../services/subscription'
@@ -40,6 +41,11 @@ export default function SubscriptionPage() {
   const [saving, setSaving] = useState<PlanId | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  // Modal de paiement (simulation Mobile Money) pour les plans payants.
+  const [checkoutTarget, setCheckoutTarget] = useState<Plan | null>(null)
+  const [phone, setPhone] = useState('')
+  const [paying, setPaying] = useState(false)
+  const [payError, setPayError] = useState<string | null>(null)
 
   useEffect(() => {
     Promise.all([getPlans(), getCurrentSubscription()])
@@ -51,19 +57,49 @@ export default function SubscriptionPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  async function onChoose(plan: PlanId) {
-    if (plan === currentPlan || saving) return
-    setSaving(plan)
+  async function onChoose(plan: Plan) {
+    if (plan.id === currentPlan || saving) return
     setError(null)
     setSuccess(null)
+    // Plan payant : on passe par la simulation de paiement Mobile Money.
+    if (plan.priceFcfa > 0) {
+      setPayError(null)
+      setPhone('')
+      setCheckoutTarget(plan)
+      return
+    }
+    // Plan gratuit (downgrade) : application directe, sans paiement.
+    setSaving(plan.id)
     try {
-      const res = await changePlan(plan)
+      const res = await changePlan(plan.id)
       setCurrentPlan(res.plan.id)
       setSuccess(`Votre abonnement est maintenant : ${res.plan.label}.`)
     } catch (err) {
       setError(apiError(err, 'Le changement de plan a échoué'))
     } finally {
       setSaving(null)
+    }
+  }
+
+  // Confirme le paiement simulé puis active le plan payant.
+  async function onConfirmPayment(e: React.FormEvent) {
+    e.preventDefault()
+    if (!checkoutTarget || paying) return
+    setPaying(true)
+    setPayError(null)
+    try {
+      // Petit délai pour matérialiser le « traitement » du paiement Mobile Money.
+      await new Promise((r) => setTimeout(r, 1200))
+      const res = await checkoutPlan(checkoutTarget.id, phone.trim())
+      setCurrentPlan(res.plan.id)
+      setSuccess(
+        `Paiement de ${res.payment.amountFcfa.toLocaleString('fr-FR')} FCFA confirmé (réf. ${res.payment.reference}). Abonnement ${res.plan.label} activé.`,
+      )
+      setCheckoutTarget(null)
+    } catch (err) {
+      setPayError(apiError(err, 'Le paiement a échoué'))
+    } finally {
+      setPaying(false)
     }
   }
 
@@ -137,7 +173,7 @@ export default function SubscriptionPage() {
                   <button
                     type="button"
                     disabled={isCurrent || saving !== null}
-                    onClick={() => onChoose(plan.id)}
+                    onClick={() => onChoose(plan)}
                     className={cn(
                       'mt-6 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition',
                       isCurrent
@@ -151,6 +187,63 @@ export default function SubscriptionPage() {
                 </div>
               )
             })}
+          </div>
+        )}
+
+        {checkoutTarget && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+            <div className="w-full max-w-md rounded-2xl glass ring-1 ring-white/30 shadow-soft p-6">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-2 text-lg font-bold text-slate-900">
+                  <Smartphone size={20} className="text-brand-orange" /> Paiement Mobile Money
+                </div>
+                <button
+                  type="button"
+                  onClick={() => !paying && setCheckoutTarget(null)}
+                  aria-label="Fermer"
+                  className="text-slate-400 hover:text-slate-700 transition"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <p className="mt-1 text-sm text-slate-600">
+                Abonnement <span className="font-semibold">{checkoutTarget.label}</span> —{' '}
+                <span className="font-semibold">{checkoutTarget.priceFcfa.toLocaleString('fr-FR')} FCFA/mois</span>
+              </p>
+              <p className="mt-1 inline-flex rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+                Simulation — aucun paiement réel n'est effectué
+              </p>
+
+              <form onSubmit={onConfirmPayment} className="mt-4 space-y-3">
+                <div>
+                  <label className="text-sm font-medium text-slate-700">Numéro Mobile Money</label>
+                  <input
+                    className="mt-1 w-full rounded-xl bg-white/70 ring-1 ring-slate-200/70 px-4 py-2"
+                    type="tel"
+                    placeholder="ex. 6XX XXX XXX"
+                    required
+                    minLength={6}
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    disabled={paying}
+                  />
+                </div>
+
+                {payError && (
+                  <div className="rounded-xl bg-red-50 ring-1 ring-red-200 px-4 py-2.5 text-sm text-red-700">{payError}</div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={paying}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-orange px-4 py-2.5 text-sm font-semibold text-white hover:opacity-95 transition disabled:opacity-60"
+                >
+                  {paying && <Loader2 className="animate-spin" size={16} />}
+                  {paying ? 'Paiement en cours…' : `Payer ${checkoutTarget.priceFcfa.toLocaleString('fr-FR')} FCFA`}
+                </button>
+              </form>
+            </div>
           </div>
         )}
       </div>

@@ -63,6 +63,23 @@ export async function listByTontine(tontineId: string): Promise<Payment[]> {
   return res.rows;
 }
 
+// Somme cotisée par le groupe : total cumulé (tous cycles) et total du cycle courant.
+// Sert à afficher la « cagnotte » visible par tous les membres.
+export async function totalsForTontine(
+  tontineId: string,
+  currentCycle: number
+): Promise<{ allTime: number; currentCycle: number }> {
+  const res = await pool.query(
+    `SELECT
+       COALESCE(SUM(amount), 0) AS all_time,
+       COALESCE(SUM(amount) FILTER (WHERE cycle = $2), 0) AS current_cycle
+     FROM payments WHERE tontine_id = $1`,
+    [tontineId, currentCycle]
+  );
+  const row = res.rows[0];
+  return { allTime: Number(row.all_time), currentCycle: Number(row.current_cycle) };
+}
+
 // Identifiants des membres ayant déjà cotisé pour un cycle donné
 // (sert à afficher « qui a payé » et à cibler les rappels).
 export async function paidUserIdsForCycle(

@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { UserPlus, Trophy, Trash2, CalendarClock, CheckCircle2, Clock } from 'lucide-react'
+import { io, type Socket } from 'socket.io-client'
+import { UserPlus, Trophy, Trash2, CalendarClock, CheckCircle2, Clock, Wallet, Users } from 'lucide-react'
 import {
   addMember,
   removeMember,
@@ -11,12 +12,17 @@ import {
   getHistory,
   getRotation,
   type Group,
+  type GroupCapacity,
+  type GroupTotals,
   type Member,
   type Payment,
   type Rubric,
 } from '../../services/groups'
 import { apiError } from '../../services/api'
 import { useAuthStore } from '../../stores/authStore'
+
+// Même origine par défaut (la gateway proxifie /socket.io/ vers le notification-service).
+const NOTIFY_URL = import.meta.env.VITE_NOTIFY_URL || ''
 
 // Convertit une date ISO (UTC) vers le format attendu par <input type="datetime-local">.
 function toLocalInput(iso: string): string {
@@ -28,10 +34,13 @@ function toLocalInput(iso: string): string {
 export default function GroupDetailsPage() {
   const { id = '' } = useParams()
   const currentUserId = useAuthStore((s) => s.user?.id)
+  const token = useAuthStore((s) => s.token)
   const [group, setGroup] = useState<Group | null>(null)
   const [members, setMembers] = useState<Member[]>([])
   const [rubrics, setRubrics] = useState<Rubric[]>([])
   const [history, setHistory] = useState<Payment[]>([])
+  const [totals, setTotals] = useState<GroupTotals | null>(null)
+  const [capacity, setCapacity] = useState<GroupCapacity | null>(null)
   const [nextBeneficiary, setNextBeneficiary] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -54,29 +63,52 @@ export default function GroupDetailsPage() {
 
   const isOwner = !!group && group.owner_user_id === currentUserId
 
-  async function load() {
-    setLoading(true)
-    try {
-      const [g, rot, hist] = await Promise.all([getGroup(id), getRotation(id), getHistory(id)])
-      setGroup(g.group)
-      setMembers(g.members)
-      setRubrics(g.rubrics)
-      setNextBeneficiary(rot.nextBeneficiary?.userId ?? null)
-      setHistory(hist)
-      // Pré-remplit le champ <input datetime-local> (format YYYY-MM-DDTHH:mm).
-      setDeadlineInput(g.group.payment_deadline ? toLocalInput(g.group.payment_deadline) : '')
-      setError(null)
-    } catch (err) {
-      setError(apiError(err, 'Impossible de charger le groupe'))
-    } finally {
-      setLoading(false)
-    }
-  }
+  // silent = rafraîchissement temps réel sans afficher le spinner de chargement.
+  const load = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      if (!opts?.silent) setLoading(true)
+      try {
+        const [g, rot, hist] = await Promise.all([getGroup(id), getRotation(id), getHistory(id)])
+        setGroup(g.group)
+        setMembers(g.members)
+        setRubrics(g.rubrics)
+        setTotals(g.totals)
+        setCapacity(g.capacity)
+        setNextBeneficiary(rot.nextBeneficiary?.userId ?? null)
+        setHistory(hist)
+        // Pré-remplit le champ <input datetime-local> (format YYYY-MM-DDTHH:mm).
+        setDeadlineInput(g.group.payment_deadline ? toLocalInput(g.group.payment_deadline) : '')
+        setError(null)
+      } catch (err) {
+        if (!opts?.silent) setError(apiError(err, 'Impossible de charger le groupe'))
+      } finally {
+        if (!opts?.silent) setLoading(false)
+      }
+    },
+    [id],
+  )
 
   useEffect(() => {
     if (id) load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id])
+  }, [id, load])
+
+  // Actualisation temps réel : à chaque notification de cotisation/groupe reçue via
+  // Socket.io, on recharge silencieusement les données (cagnotte, statuts de paiement…).
+  useEffect(() => {
+    if (!id || !token) return
+    const socket: Socket = io(NOTIFY_URL || undefined, {
+      auth: { token },
+      transports: ['websocket', 'polling'],
+    })
+    socket.on('notification', (payload: { type?: string }) => {
+      if (payload?.type === 'payment' || payload?.type === 'group') {
+        load({ silent: true })
+      }
+    })
+    return () => {
+      socket.disconnect()
+    }
+  }, [id, token, load])
 
   // Pré-remplit le montant selon la rubrique choisie (ou le total si « Tout payer »).
   function onSelectRubric(value: string) {
@@ -214,6 +246,39 @@ export default function GroupDetailsPage() {
           )}
 
           {error && <div className="mt-4 rounded-xl bg-red-50 ring-1 ring-red-200 px-4 py-3 text-sm text-red-700">{error}</div>}
+        </div>
+
+        {/* Cagnotte + participants — visibles par tous les membres, actualisés à chaque cotisation */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="rounded-2xl glass ring-1 ring-white/20 p-5 sm:p-6">
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+              <Wallet size={18} className="text-brand-orange" /> Cagnotte du groupe
+            </div>
+            <div className="mt-3 text-3xl font-extrabold text-slate-900">
+              {Number(totals?.currentCycle ?? 0).toLocaleString()} <span className="text-lg font-bold text-slate-500">CFA</span>
+            </div>
+            <p className="mt-1 text-xs text-slate-500">
+              Cotisé pour le cycle {group?.current_cycle} · Total cumulé : {Number(totals?.allTime ?? 0).toLocaleString()} CFA
+            </p>
+          </div>
+          <div className="rounded-2xl glass ring-1 ring-white/20 p-5 sm:p-6">
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+              <Users size={18} className="text-brand-blue" /> Participants
+            </div>
+            <div className="mt-3 text-3xl font-extrabold text-slate-900">
+              {capacity?.memberCount ?? members.length}
+              {capacity?.maxMembers != null && (
+                <span className="text-lg font-bold text-slate-500"> / {capacity.maxMembers}</span>
+              )}
+            </div>
+            <p className="mt-1 text-xs text-slate-500">
+              {capacity?.maxMembers == null
+                ? 'Capacité illimitée (plan Premium).'
+                : capacity.memberCount >= capacity.maxMembers
+                  ? 'Groupe complet.'
+                  : `${capacity.maxMembers - capacity.memberCount} place(s) restante(s).`}
+            </p>
+          </div>
         </div>
 
         {/* Ajout de membre — créateur uniquement */}

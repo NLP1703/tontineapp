@@ -40,4 +40,17 @@ router.get('/plans', subscription.listPlans);
 router.get('/', subscription.current);
 router.put('/', subscription.change);
 
+/**
+ * @swagger
+ * /api/subscription/checkout:
+ *   post:
+ *     summary: Payer (simulation Mobile Money) puis activer un plan payant
+ *     tags: [Subscription]
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: Paiement simulé réussi, plan activé }
+ *       400: { description: Données invalides }
+ */
+router.post('/checkout', subscription.checkout);
+
 export default router;

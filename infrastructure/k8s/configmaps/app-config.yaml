@@ -12,3 +12,8 @@ data:
   # Hôte DNS interne du service PostgreSQL.
   DB_HOST: "postgres"
   DB_PORT: "5432"
+  # Relais SMTP (non sensible). Dev : SMTP_HOST=mailpit, SMTP_PORT=1025 (attrape-mail local).
+  # Prod / livraison réelle : Gmail = smtp.gmail.com:587 (STARTTLS). Les identifiants
+  # (SMTP_USER / SMTP_PASS / SMTP_FROM) vivent dans le Secret app-secrets.
+  SMTP_HOST: "smtp.gmail.com"
+  SMTP_PORT: "587"

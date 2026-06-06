@@ -24,9 +24,14 @@ function createClient(baseURL: string): AxiosInstance {
   return client
 }
 
-const AUTH_URL = import.meta.env.VITE_AUTH_URL ?? 'http://localhost:3001'
-const TONTINE_URL = import.meta.env.VITE_TONTINE_URL ?? 'http://localhost:3002'
-const NOTIFY_URL = import.meta.env.VITE_NOTIFY_URL ?? 'http://localhost:3003'
+// Same-origin par défaut : base vide => les appels partent en relatif (/api/...)
+// et sont routés par l'API Gateway Nginx (prod/cluster) ou par le proxy Vite en
+// dev (cf. vite.config.ts). On n'utilise une URL absolue QUE si VITE_*_URL est
+// défini ET non vide — plus jamais de fallback `localhost:300x` qui provoque des
+// ERR_CONNECTION_REFUSED dès qu'on n'est pas en dev direct.
+const AUTH_URL = import.meta.env.VITE_AUTH_URL || ''
+const TONTINE_URL = import.meta.env.VITE_TONTINE_URL || ''
+const NOTIFY_URL = import.meta.env.VITE_NOTIFY_URL || ''
 
 export const authApi = createClient(AUTH_URL)
 export const tontineApi = createClient(TONTINE_URL)

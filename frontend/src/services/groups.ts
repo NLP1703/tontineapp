@@ -11,6 +11,20 @@ export interface Group {
   status: string
   payment_deadline?: string | null
   payment_day?: number | null
+  // Capacité choisie à la création (nombre de participants) ; null = plafond du plan seul.
+  max_members?: number | null
+}
+
+// Cagnotte du groupe : total cumulé (tous cycles) et total du cycle courant.
+export interface GroupTotals {
+  allTime: number
+  currentCycle: number
+}
+
+// Occupation du groupe : membres actuels et capacité maximale (null = pas de plafond propre).
+export interface GroupCapacity {
+  memberCount: number
+  maxMembers: number | null
 }
 
 export interface Rubric {
@@ -56,6 +70,7 @@ export async function createGroup(input: {
   contributionAmount: number
   frequency: string
   paymentDay?: number | null
+  maxMembers?: number | null
   rubrics?: Array<{ name: string; amount: number }>
 }) {
   const { data } = await tontineApi.post('/api/groups', input)
@@ -64,7 +79,13 @@ export async function createGroup(input: {
 
 export async function getGroup(id: string) {
   const { data } = await tontineApi.get(`/api/groups/${id}`)
-  return data as { group: Group; members: Member[]; rubrics: Rubric[] }
+  return data as {
+    group: Group
+    members: Member[]
+    rubrics: Rubric[]
+    totals: GroupTotals
+    capacity: GroupCapacity
+  }
 }
 
 // Ajoute un membre par email OU numéro de téléphone (réservé au créateur).

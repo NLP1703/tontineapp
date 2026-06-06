@@ -6,6 +6,7 @@ import bcrypt from 'bcryptjs';
 import * as Users from '../models/user.js';
 import * as Otps from '../models/otp.js';
 import type { OtpPurpose } from '../models/otp.js';
+import * as Pending from '../models/pendingRegistration.js';
 import { sendMail } from '../mailer.js';
 
 function signToken(userId: string): string {
@@ -17,18 +18,18 @@ function signToken(userId: string): string {
   );
 }
 
-// Génère un OTP à 6 chiffres, le persiste et l'envoie par email.
-// Retourne le code (exposé en clair seulement hors production, pour le debug).
-async function issueOtp(
-  userId: string,
-  email: string,
-  fullName: string,
-  purpose: OtpPurpose
-): Promise<string> {
-  const otp = String(Math.floor(100000 + Math.random() * 900000));
-  const ttlMinutes = Number(process.env.OTP_TTL_MINUTES || 10);
-  await Otps.create(userId, otp, ttlMinutes, purpose);
+function newOtp(): string {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
 
+function otpTtlMinutes(): number {
+  return Number(process.env.OTP_TTL_MINUTES || 10);
+}
+
+// Envoie un email OTP (sujet/corps selon la finalité). En arrière-plan : la réponse
+// HTTP ne doit jamais attendre le SMTP. sendMail logue ses propres erreurs.
+function sendOtpEmail(email: string, fullName: string, otp: string, purpose: OtpPurpose): void {
+  const ttlMinutes = otpTtlMinutes();
   const subject =
     purpose === 'signup'
       ? 'Votre code de vérification TontineApp'
@@ -37,14 +38,19 @@ async function issueOtp(
     purpose === 'signup'
       ? `Bonjour ${fullName}, confirmez votre adresse email avec le code ci-dessous.`
       : `Bonjour ${fullName}, utilisez ce code pour réinitialiser votre mot de passe.`;
-  // Envoi en arrière-plan : la réponse HTTP (inscription/connexion) ne doit jamais
-  // attendre le SMTP. Le code OTP est déjà persisté ci-dessus. sendMail logue ses erreurs.
   void sendMail(
     email,
     subject,
     `${intro}\n\nCode : ${otp}\n\nIl expire dans ${ttlMinutes} minutes.`,
     `<p>${intro}</p><p style="font-size:24px;font-weight:bold;letter-spacing:3px">${otp}</p><p>Il expire dans ${ttlMinutes} minutes.</p>`
   );
+}
+
+// Génère un OTP de réinitialisation pour un utilisateur EXISTANT, le persiste et l'envoie.
+async function issueResetOtp(userId: string, email: string, fullName: string): Promise<string> {
+  const otp = newOtp();
+  await Otps.create(userId, otp, otpTtlMinutes(), 'password_reset');
+  sendOtpEmail(email, fullName, otp, 'password_reset');
   return otp;
 }
 
@@ -64,21 +70,25 @@ export async function register(req: Request, res: Response) {
   if (await Users.existsByEmail(email)) {
     return res.status(409).json({ error: 'Email already used' });
   }
-  if (phone && (await Users.existsByPhone(phone))) {
+  if (phone && ((await Users.existsByPhone(phone)) || (await Pending.existsByPhone(phone, email)))) {
     return res.status(409).json({ error: 'Phone already used' });
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const user = await Users.create(fullName, email, passwordHash, phone ?? null);
+  const otp = newOtp();
 
-  // Vérification de l'email obligatoire : on envoie un OTP, pas de token tout de suite.
-  const debugOtp = await issueOtp(user.id, user.email, user.full_name, 'signup');
+  // Vérification de l'email obligatoire AVANT toute création de compte : on garde
+  // l'inscription "en attente" et on envoie un OTP. Aucune ligne n'est écrite dans
+  // `users` tant que le code n'est pas validé (verifyOtp). Sans validation, l'inscrit
+  // n'existe pas en base et ne peut pas se connecter.
+  await Pending.upsert(fullName, email, passwordHash, phone ?? null, otp, otpTtlMinutes());
+  sendOtpEmail(email, fullName, otp, 'signup');
 
   const payload: { requiresOtp: true; email: string; debugOtp?: string } = {
     requiresOtp: true,
-    email: user.email,
+    email,
   };
-  if (process.env.NODE_ENV !== 'production') payload.debugOtp = debugOtp;
+  if (process.env.NODE_ENV !== 'production') payload.debugOtp = otp;
   return res.status(201).json(payload);
 }
 
@@ -99,16 +109,11 @@ export async function login(req: Request, res: Response) {
   const ok = await bcrypt.compare(password, user.password_hash);
   if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
 
-  // Email non vérifié : on (re)génère un OTP et on demande la vérification.
+  // Un email non vérifié n'a pas accès au site. Avec le flux actuel, un compte
+  // n'existe dans `users` qu'après validation de l'OTP (cf. register/verifyOtp),
+  // donc ce cas ne devrait plus survenir — garde défensive pour les comptes hérités.
   if (user.email_verified === false) {
-    const debugOtp = await issueOtp(user.id, user.email, user.full_name, 'signup');
-    const payload: { error: string; requiresOtp: true; email: string; debugOtp?: string } = {
-      error: 'Email non vérifié',
-      requiresOtp: true,
-      email: user.email,
-    };
-    if (process.env.NODE_ENV !== 'production') payload.debugOtp = debugOtp;
-    return res.status(403).json(payload);
+    return res.status(403).json({ error: 'Email not verified' });
   }
 
   return res.json({
@@ -129,7 +134,7 @@ export async function forgotPassword(req: Request, res: Response) {
   // Toujours répondre 200 pour éviter l'énumération d'utilisateurs
   if (!user) return res.json({ ok: true });
 
-  const otp = await issueOtp(user.id, user.email, user.full_name, 'password_reset');
+  const otp = await issueResetOtp(user.id, user.email, user.full_name);
 
   const payload: { ok: boolean; debugOtp?: string } = { ok: true };
   if (process.env.NODE_ENV !== 'production') payload.debugOtp = otp;
@@ -141,25 +146,35 @@ const verifyOtpSchema = z.object({
   otp: z.string().min(4).max(10),
 });
 
+// Valide l'OTP d'inscription : c'est SEULEMENT ici que le compte est créé dans
+// `users`. Tant que cet appel n'a pas réussi, l'inscription n'existe qu'en attente.
 export async function verifyOtp(req: Request, res: Response) {
   const parsed = verifyOtpSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
   const { email, otp } = parsed.data;
 
-  const user = await Users.findByEmail(email);
-  if (!user) return res.status(400).json({ error: 'Invalid OTP' });
+  const pending = await Pending.findByEmailAndCode(email, otp);
+  if (!pending) return res.status(400).json({ error: 'Invalid OTP' });
 
-  const otpRow = await Otps.findLatest(user.id, otp);
-  if (!otpRow) return res.status(400).json({ error: 'Invalid OTP' });
-
-  if (new Date(otpRow.expires_at).getTime() < Date.now()) {
+  if (new Date(pending.expires_at).getTime() < Date.now()) {
     return res.status(400).json({ error: 'OTP expired' });
   }
 
-  await Otps.markUsed(otpRow.id);
-  // La validation d'un OTP prouve la possession de l'email → on le marque vérifié.
+  // OTP valide → l'email est prouvé → on crée enfin le compte (directement vérifié).
+  let user;
+  try {
+    user = await Users.create(pending.full_name, pending.email, pending.password_hash, pending.phone);
+  } catch (err) {
+    // Email/téléphone pris entretemps (contrainte unique) : on abandonne l'attente.
+    await Pending.deleteByEmail(email);
+    if ((err as { code?: string }).code === '23505') {
+      return res.status(409).json({ error: 'Email or phone already used' });
+    }
+    throw err;
+  }
   await Users.markEmailVerified(user.id);
+  await Pending.deleteByEmail(email);
 
   return res.json({
     token: signToken(user.id),

@@ -1,5 +1,5 @@
 # Schéma SQL complet monté dans /docker-entrypoint-initdb.d du conteneur PostgreSQL K8s.
-# Inclut le schéma de base (init.sql) + toutes les migrations (001 à 005).
+# Inclut le schéma de base (init.sql) + toutes les migrations (001 à 008).
 # Garder synchronisé avec infrastructure/db/init.sql et les fichiers migrations/.
 apiVersion: v1
 kind: ConfigMap
@@ -34,6 +34,19 @@ data:
     );
     CREATE INDEX IF NOT EXISTS idx_otps_user ON otps(user_id);
 
+    -- Inscriptions en attente de vérification OTP (migration 007) : l'utilisateur
+    -- n'existe dans `users` qu'après validation du code envoyé par email.
+    CREATE TABLE IF NOT EXISTS pending_registrations (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      full_name TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      phone TEXT,
+      password_hash TEXT NOT NULL,
+      otp_code TEXT NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
     -- Tontines (groupes)
     CREATE TABLE IF NOT EXISTS tontines (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -46,6 +59,7 @@ data:
       status TEXT NOT NULL DEFAULT 'active',
       payment_deadline TIMESTAMPTZ,
       payment_day INT,
+      max_members INT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_tontines_owner ON tontines(owner_user_id);

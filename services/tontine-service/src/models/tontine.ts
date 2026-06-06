@@ -13,6 +13,8 @@ export interface Tontine {
   // Jour récurrent de cotisation : jour du mois (1..28) si mensuel,
   // jour de la semaine (1=lundi..7=dimanche) si hebdo/bi-mensuel.
   payment_day: number | null;
+  // Capacité choisie à la création (nombre de participants) ; null = plafond du plan seul.
+  max_members: number | null;
   created_at: string;
 }
 
@@ -40,13 +42,14 @@ export async function create(
   description: string | null,
   contributionAmount: number,
   frequency: string,
-  paymentDay: number | null = null
+  paymentDay: number | null = null,
+  maxMembers: number | null = null
 ): Promise<Tontine> {
   const res = await pool.query(
-    `INSERT INTO tontines (owner_user_id, name, description, contribution_amount, frequency, payment_day)
-     VALUES ($1, $2, $3, $4, $5, $6)
+    `INSERT INTO tontines (owner_user_id, name, description, contribution_amount, frequency, payment_day, max_members)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING *`,
-    [ownerUserId, name, description, contributionAmount, frequency, paymentDay]
+    [ownerUserId, name, description, contributionAmount, frequency, paymentDay, maxMembers]
   );
   return res.rows[0];
 }

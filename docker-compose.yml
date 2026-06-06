@@ -23,6 +23,9 @@ services:
       - ./infrastructure/db/migrations/003_payment_deadline.sql:/docker-entrypoint-initdb.d/04-003_payment_deadline.sql:ro
       - ./infrastructure/db/migrations/004_email_verified.sql:/docker-entrypoint-initdb.d/05-004_email_verified.sql:ro
       - ./infrastructure/db/migrations/005_payment_day_and_payout.sql:/docker-entrypoint-initdb.d/06-005_payment_day_and_payout.sql:ro
+      - ./infrastructure/db/migrations/006_subscriptions.sql:/docker-entrypoint-initdb.d/07-006_subscriptions.sql:ro
+      - ./infrastructure/db/migrations/007_pending_registrations.sql:/docker-entrypoint-initdb.d/08-007_pending_registrations.sql:ro
+      - ./infrastructure/db/migrations/008_tontine_max_members.sql:/docker-entrypoint-initdb.d/09-008_tontine_max_members.sql:ro
     ports:
       - "5432:5432"
     healthcheck:

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { GlassCard } from '../../ui/GlassCard'
 import { createGroup, listGroups, type Group } from '../../services/groups'
+import { getCurrentSubscription, type Plan } from '../../services/subscription'
 import { apiError } from '../../services/api'
 
 export default function GroupsPage() {
@@ -14,6 +15,10 @@ export default function GroupsPage() {
   const [frequency, setFrequency] = useState('monthly')
   // Jour récurrent de cotisation (jour du mois si mensuel, jour de semaine sinon).
   const [paymentDay, setPaymentDay] = useState('')
+  // Nombre de participants souhaité (capacité du groupe), plafonné par le plan.
+  const [participants, setParticipants] = useState('')
+  // Plan d'abonnement courant : détermine le nombre max de participants.
+  const [plan, setPlan] = useState<Plan | null>(null)
   // Rubriques disponibles à la création (montant par rubrique).
   const [rubrics, setRubrics] = useState<Record<string, { enabled: boolean; amount: string }>>({
     SECOURS: { enabled: false, amount: '' },
@@ -42,7 +47,13 @@ export default function GroupsPage() {
 
   useEffect(() => {
     load()
+    // Récupère le plan courant pour plafonner le nombre de participants.
+    getCurrentSubscription()
+      .then((s) => setPlan(s.plan))
+      .catch(() => setPlan(null))
   }, [])
+
+  const planLimit = plan?.maxMembersPerGroup ?? null // null = illimité (Premium)
 
   async function onCreate(e: React.FormEvent) {
     e.preventDefault()
@@ -55,11 +66,13 @@ export default function GroupsPage() {
         contributionAmount: Number(amount) || 0,
         frequency,
         paymentDay: paymentDay ? Number(paymentDay) : null,
+        maxMembers: participants ? Number(participants) : null,
         rubrics: selectedRubrics,
       })
       setName('')
       setAmount('')
       setPaymentDay('')
+      setParticipants('')
       setRubrics({
         SECOURS: { enabled: false, amount: '' },
         COLLATION: { enabled: false, amount: '' },
@@ -131,6 +144,33 @@ export default function GroupsPage() {
                   <option value="6">Samedi</option>
                   <option value="7">Dimanche</option>
                 </select>
+              )}
+            </div>
+            <div className="sm:col-span-4">
+              <label className="text-sm font-medium text-slate-700">Nombre de participants</label>
+              <p className="text-xs text-slate-500 mb-2">
+                {planLimit === null
+                  ? `Plan ${plan?.label ?? 'Premium'} : nombre de participants illimité.`
+                  : `Plan ${plan?.label ?? 'Gratuit'} : jusqu'à ${planLimit} participants par groupe.`}{' '}
+                {planLimit !== null && (
+                  <Link to="/subscription" className="text-brand-blue font-medium hover:underline">
+                    Augmenter la limite
+                  </Link>
+                )}
+              </p>
+              <input
+                className="w-full sm:w-48 rounded-xl bg-white/60 ring-1 ring-slate-200/70 px-3 py-2"
+                type="number"
+                min="1"
+                max={planLimit ?? undefined}
+                placeholder={planLimit ? `ex. ${Math.min(10, planLimit)}` : 'ex. 50'}
+                value={participants}
+                onChange={(e) => setParticipants(e.target.value)}
+              />
+              {planLimit !== null && Number(participants) > planLimit && (
+                <p className="mt-1 text-xs text-red-600">
+                  Votre plan limite à {planLimit} participants. Passez à un plan supérieur pour en accueillir davantage.
+                </p>
               )}
             </div>
             <div className="sm:col-span-4">
