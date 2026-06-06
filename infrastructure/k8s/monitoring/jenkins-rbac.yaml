@@ -1,0 +1,33 @@
+# Droits RBAC pour que le pipeline Jenkins (service account `default` du namespace
+# tontineapp) puisse déployer sur le cluster : lire et redémarrer les déploiements.
+# kubectl, lancé dans le pod Jenkins, s'authentifie automatiquement via le token
+# in-cluster de ce service account.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: jenkins-deployer
+  namespace: tontineapp
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "patch", "update"]
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: jenkins-deployer
+  namespace: tontineapp
+subjects:
+  - kind: ServiceAccount
+    name: default
+    namespace: tontineapp
+roleRef:
+  kind: Role
+  name: jenkins-deployer
+  apiGroup: rbac.authorization.k8s.io

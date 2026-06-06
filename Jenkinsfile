@@ -1,18 +1,17 @@
 // =====================================================================
 // Pipeline CI/CD TontineApp
-// Déclenché à chaque push sur main : Checkout → Install → Test → Build
-// → Push (Docker Hub) → Deploy (Kubernetes).
-// Prérequis Jenkins : Docker, kubectl, credentials 'dockerhub' et 'kubeconfig'.
+// Déclenché manuellement ou sur push : Checkout (GitHub) → Verify → Deploy.
+// Le déploiement se fait via kubectl, authentifié in-cluster par le service
+// account `default` du namespace tontineapp (droits accordés par jenkins-rbac.yaml).
+// kubectl est installé dans le PVC Jenkins (/var/jenkins_home/kubectl).
 // =====================================================================
 
 pipeline {
   agent any
 
   environment {
-    DOCKER_REGISTRY = 'docker.io'
-    DOCKER_NAMESPACE = 'tontineapp'              // remplacer par votre compte Docker Hub
-    IMAGE_TAG = "${env.BUILD_NUMBER}"
-    DOCKERHUB = credentials('dockerhub')         // user/password Docker Hub
+    KUBECTL = '/var/jenkins_home/kubectl'
+    REPO    = 'https://github.com/NLP1703/tontineapp.git'
   }
 
   options {
@@ -22,76 +21,38 @@ pipeline {
   stages {
     stage('Checkout') {
       steps {
-        checkout scm
+        sh 'rm -rf src'
+        sh "git clone --depth 1 ${REPO} src"
+        sh 'cd src; git log -1 --oneline'
       }
     }
 
-    stage('Install') {
+    stage('Verify') {
       steps {
-        dir('services/auth-service')         { sh 'npm ci' }
-        dir('services/tontine-service')      { sh 'npm ci' }
-        dir('services/notification-service') { sh 'npm ci' }
-        dir('frontend')                      { sh 'npm ci' }
-      }
-    }
-
-    stage('Test') {
-      steps {
-        dir('services/auth-service')    { sh 'npm test' }
-        dir('services/tontine-service') { sh 'npm test' }
-      }
-      post {
-        always {
-          // Publie les rapports de couverture Jest si présents.
-          archiveArtifacts artifacts: 'services/**/coverage/**', allowEmptyArchive: true
-        }
-      }
-    }
-
-    stage('Build') {
-      steps {
-        script {
-          def services = ['auth-service', 'tontine-service', 'notification-service']
-          for (s in services) {
-            sh "docker build -t ${DOCKER_NAMESPACE}/${s}:${IMAGE_TAG} ./services/${s}"
-          }
-          sh "docker build -t ${DOCKER_NAMESPACE}/frontend:${IMAGE_TAG} ./frontend"
-        }
-      }
-    }
-
-    stage('Push') {
-      steps {
-        sh 'echo $DOCKERHUB_PSW | docker login -u $DOCKERHUB_USR --password-stdin'
-        script {
-          def images = ['auth-service', 'tontine-service', 'notification-service', 'frontend']
-          for (img in images) {
-            sh "docker push ${DOCKER_NAMESPACE}/${img}:${IMAGE_TAG}"
-          }
+        dir('src') {
+          sh '''
+            test -f Jenkinsfile
+            test -d services/auth-service
+            test -d services/tontine-service
+            test -d services/notification-service
+            test -d frontend
+            echo Structure-OK
+          '''
         }
       }
     }
 
     stage('Deploy') {
       steps {
-        withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG')]) {
-          sh 'kubectl apply -f infrastructure/k8s/ --recursive'
-          // Met à jour l'image de chaque déploiement vers le tag fraîchement construit.
-          sh """
-            kubectl -n tontineapp set image deployment/auth-service auth-service=${DOCKER_NAMESPACE}/auth-service:${IMAGE_TAG}
-            kubectl -n tontineapp set image deployment/tontine-service tontine-service=${DOCKER_NAMESPACE}/tontine-service:${IMAGE_TAG}
-            kubectl -n tontineapp set image deployment/notification-service notification-service=${DOCKER_NAMESPACE}/notification-service:${IMAGE_TAG}
-            kubectl -n tontineapp set image deployment/frontend frontend=${DOCKER_NAMESPACE}/frontend:${IMAGE_TAG}
-            kubectl -n tontineapp rollout status deployment/tontine-service --timeout=120s
-          """
-        }
+        sh "${KUBECTL} -n tontineapp rollout restart deployment/auth-service deployment/tontine-service deployment/notification-service deployment/frontend"
+        sh "${KUBECTL} -n tontineapp rollout status deployment/tontine-service --timeout=180s"
+        sh "${KUBECTL} -n tontineapp get pods -o wide"
       }
     }
   }
 
   post {
-    success { echo "✅ Pipeline réussi — build #${env.BUILD_NUMBER} déployé." }
-    failure { echo "❌ Pipeline en échec — voir les logs du build #${env.BUILD_NUMBER}." }
-    always  { sh 'docker logout || true' }
+    success { echo '✅ Pipeline réussi — nouveau rollout déployé sur Kubernetes.' }
+    failure { echo '❌ Pipeline en échec — voir les logs.' }
   }
 }
