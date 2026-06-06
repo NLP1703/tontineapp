@@ -20,6 +20,37 @@ export async function list(req: Request, res: Response) {
   return res.json({ groups });
 }
 
+// Libellés de mois courts (FR) pour la série du graphique du tableau de bord.
+const MONTHS_FR = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+
+// GET /api/groups/summary — récapitulatif RÉEL du tableau de bord de l'utilisateur :
+// ses groupes, le total qu'il a réellement cotisé, le détail par groupe et la série
+// mensuelle (6 derniers mois) pour le graphique. Remplace les valeurs configurées/figées.
+export async function summary(req: Request, res: Response) {
+  const uid = userId(req);
+  const [groups, contrib] = await Promise.all([
+    Tontines.listForUser(uid),
+    Payments.userContributionSummary(uid),
+  ]);
+
+  // Série complète des 6 derniers mois (un mois sans cotisation vaut 0).
+  const byMonth = new Map(contrib.monthly.map((m) => [m.month, m.amount]));
+  const now = new Date();
+  const series: Array<{ label: string; amount: number }> = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    series.push({ label: MONTHS_FR[d.getMonth()], amount: byMonth.get(key) ?? 0 });
+  }
+
+  return res.json({
+    groups,
+    totalContributed: contrib.totalContributed,
+    perGroup: contrib.perGroup,
+    series,
+  });
+}
+
 // Rubriques autorisées à la création d'un groupe.
 const RUBRIC_NAMES = ['SECOURS', 'COLLATION', 'EPARGNE'] as const;
 

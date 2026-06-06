@@ -64,6 +64,21 @@ export async function listGroups() {
   return data.groups as Group[]
 }
 
+// Récapitulatif RÉEL du tableau de bord : groupes de l'utilisateur, total qu'il a
+// effectivement cotisé, détail par groupe et série mensuelle (6 derniers mois).
+export interface DashboardSummary {
+  groups: Group[]
+  totalContributed: number
+  // tontineId -> montant réellement cotisé par l'utilisateur dans ce groupe
+  perGroup: Record<string, number>
+  series: Array<{ label: string; amount: number }>
+}
+
+export async function getDashboardSummary() {
+  const { data } = await tontineApi.get('/api/groups/summary')
+  return data as DashboardSummary
+}
+
 export async function createGroup(input: {
   name: string
   description?: string

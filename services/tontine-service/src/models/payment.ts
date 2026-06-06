@@ -93,6 +93,43 @@ export async function paidUserIdsForCycle(
   return res.rows.map((r) => r.user_id as string);
 }
 
+// Récapitulatif des cotisations personnelles d'un utilisateur, tous groupes confondus :
+// total cumulé + ventilation par mois (6 derniers mois) + total cotisé par tontine.
+// Sert à alimenter le tableau de bord en données RÉELLES (et non plus en valeurs configurées).
+export async function userContributionSummary(userId: string): Promise<{
+  totalContributed: number;
+  monthly: { month: string; amount: number }[];
+  perGroup: Record<string, number>;
+}> {
+  const [totalRes, monthlyRes, perGroupRes] = await Promise.all([
+    pool.query(`SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE user_id = $1`, [userId]),
+    pool.query(
+      `SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') AS month,
+              COALESCE(SUM(amount), 0) AS amount
+       FROM payments
+       WHERE user_id = $1
+         AND created_at >= date_trunc('month', NOW()) - INTERVAL '5 months'
+       GROUP BY 1
+       ORDER BY 1`,
+      [userId]
+    ),
+    pool.query(
+      `SELECT tontine_id, COALESCE(SUM(amount), 0) AS amount
+       FROM payments WHERE user_id = $1 GROUP BY tontine_id`,
+      [userId]
+    ),
+  ]);
+
+  const perGroup: Record<string, number> = {};
+  for (const r of perGroupRes.rows) perGroup[r.tontine_id as string] = Number(r.amount);
+
+  return {
+    totalContributed: Number(totalRes.rows[0].total),
+    monthly: monthlyRes.rows.map((r) => ({ month: r.month as string, amount: Number(r.amount) })),
+    perGroup,
+  };
+}
+
 // Historique de paiement d'un membre (utilisé pour le score de fiabilité).
 export async function historyForMember(
   tontineId: string,

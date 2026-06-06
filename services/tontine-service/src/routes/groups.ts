@@ -30,6 +30,19 @@ router.post('/', groups.create);
 
 /**
  * @swagger
+ * /api/groups/summary:
+ *   get:
+ *     summary: Récapitulatif du tableau de bord (cotisations réelles de l'utilisateur)
+ *     tags: [Groups]
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: Groupes, total cotisé, détail par groupe et série mensuelle }
+ */
+// NB : doit rester AVANT `/:id` sinon « summary » serait capturé comme un identifiant.
+router.get('/summary', groups.summary);
+
+/**
+ * @swagger
  * /api/groups/{id}:
  *   get:
  *     summary: Détail d'un groupe + membres
