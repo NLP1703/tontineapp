@@ -5,6 +5,7 @@ import swaggerUi from 'swagger-ui-express';
 
 import groupsRoutes from './routes/groups.js';
 import subscriptionRoutes from './routes/subscription.js';
+import adminRoutes from './routes/admin.js';
 import { metricsMiddleware, metricsHandler } from './metrics.js';
 import { swaggerSpec } from './swagger.js';
 
@@ -22,6 +23,9 @@ export function createApp() {
 
   app.use('/api/groups', groupsRoutes);
   app.use('/api/subscription', subscriptionRoutes);
+  // Routes d'administration (groupes, transactions, stats). Le routeur applique
+  // lui-même requireAuth + requireRole(super_admin) + rate limit.
+  app.use('/api/admin', adminRoutes);
 
   return app;
 }

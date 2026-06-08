@@ -13,7 +13,9 @@ import SubscriptionPage from './pages/SubscriptionPage'
 import PaymentsPage from './pages/PaymentsPage'
 import NotificationsPage from './pages/NotificationsPage'
 import ProtectedRoute from './components/ProtectedRoute'
+import RequireAdmin from './components/RequireAdmin'
 import AppLayout from './components/AppLayout'
+import AdminDashboard from './pages/admin/AdminDashboard'
 
 export default function App() {
   return (
@@ -36,6 +38,9 @@ export default function App() {
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/subscription" element={<SubscriptionPage />} />
         <Route path="/profile" element={<ProfilePage />} />
+        {/* Module Admin : accessible uniquement au rôle super_admin (garde côté
+            client + sécurité serveur sur /api/admin/*). */}
+        <Route path="/admin" element={<RequireAdmin><AdminDashboard /></RequireAdmin>} />
       </Route>
 
       {/* Fallback: évite un rendu vide si aucune route ne matche */}

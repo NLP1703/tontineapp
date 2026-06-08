@@ -16,9 +16,14 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT NOT NULL UNIQUE,
   phone TEXT,
   password_hash TEXT NOT NULL,
+  -- Rôle : member | group_admin (réservé) | super_admin (cf. migration 009)
+  role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('member', 'group_admin', 'super_admin')),
+  -- Soft delete : un compte désactivé ne peut plus se connecter (cf. migration 009)
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone ON users(phone) WHERE phone IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 
 -- ---------------------------------------------------------------------
 -- OTP (réinitialisation de mot de passe, géré par auth-service)
@@ -142,3 +147,21 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(user_id);
+
+-- ---------------------------------------------------------------------
+-- Journal d'audit — module Admin (cf. migration 009)
+-- Trace toute action d'administration. Écrit par auth-service ET
+-- tontine-service (base partagée).
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  admin_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  action TEXT NOT NULL,
+  target_type TEXT NOT NULL,
+  target_id TEXT,
+  details JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_admin ON audit_logs(admin_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);

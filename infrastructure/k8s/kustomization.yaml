@@ -30,5 +30,8 @@ resources:
   # Monitoring
   - monitoring/prometheus.yaml
   - monitoring/grafana.yaml
+  # CI/CD — Jenkins (RBAC avant le déploiement) ; routé via le gateway sur /jenkins/
+  - monitoring/jenkins-rbac.yaml
+  - monitoring/jenkins.yaml
   # Mise à l'échelle automatique
   - hpa/tontine-hpa.yaml

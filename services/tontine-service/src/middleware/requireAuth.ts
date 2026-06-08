@@ -15,6 +15,9 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     if (!sub) return res.status(401).json({ error: 'Invalid token' });
 
     (req as any).userId = String(sub);
+    // Rôle porté par le JWT signé par l'auth-service (défaut 'member' pour les
+    // tokens hérités). Sert à requireRole pour protéger les routes admin.
+    (req as any).userRole = (payload as any).role || 'member';
     return next();
   } catch {
     return res.status(401).json({ error: 'Invalid token' });

@@ -1,10 +1,13 @@
 import { authApi } from './api'
 
+export type UserRole = 'member' | 'group_admin' | 'super_admin'
+
 export interface AuthUser {
   id: string
   fullName?: string
   email?: string
   phone?: string | null
+  role?: UserRole
 }
 
 // L'inscription ne connecte pas tout de suite : un OTP est envoyé par email.

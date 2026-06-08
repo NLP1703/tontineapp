@@ -34,6 +34,12 @@ spec:
               valueFrom: { secretKeyRef: { name: app-secrets, key: DATABASE_URL } }
             - name: JWT_SECRET
               valueFrom: { secretKeyRef: { name: app-secrets, key: JWT_SECRET } }
+            # Seed du super_admin (cf. migration 009). Présents dans le conteneur
+            # pour pouvoir lancer `npm run seed:admin:prod` via kubectl exec.
+            - name: ADMIN_EMAIL
+              valueFrom: { secretKeyRef: { name: app-secrets, key: ADMIN_EMAIL } }
+            - name: ADMIN_PASSWORD
+              valueFrom: { secretKeyRef: { name: app-secrets, key: ADMIN_PASSWORD } }
             # SMTP : hôte/port via la ConfigMap (Gmail par défaut), identifiants via le Secret.
             # Pour revenir à Mailpit (dev), repasser SMTP_HOST=mailpit / SMTP_PORT=1025 dans app-config.
             - name: SMTP_HOST

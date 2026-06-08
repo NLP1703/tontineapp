@@ -9,10 +9,10 @@ import type { OtpPurpose } from '../models/otp.js';
 import * as Pending from '../models/pendingRegistration.js';
 import { sendMail } from '../mailer.js';
 
-function signToken(userId: string): string {
+function signToken(userId: string, role: string = 'member'): string {
   const expiresIn = (process.env.JWT_EXPIRES_IN || '7d') as SignOptions['expiresIn'];
   return jwt.sign(
-    { sub: String(userId) },
+    { sub: String(userId), role },
     process.env.JWT_SECRET || 'change_me_secret',
     { expiresIn }
   );
@@ -116,9 +116,20 @@ export async function login(req: Request, res: Response) {
     return res.status(403).json({ error: 'Email not verified' });
   }
 
+  // Compte désactivé (soft delete admin) : connexion refusée.
+  if (user.is_active === false) {
+    return res.status(403).json({ error: 'Account disabled' });
+  }
+
   return res.json({
-    token: signToken(user.id),
-    user: { id: user.id, fullName: user.full_name, email: user.email, phone: user.phone },
+    token: signToken(user.id, user.role),
+    user: {
+      id: user.id,
+      fullName: user.full_name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role ?? 'member',
+    },
   });
 }
 
@@ -177,8 +188,14 @@ export async function verifyOtp(req: Request, res: Response) {
   await Pending.deleteByEmail(email);
 
   return res.json({
-    token: signToken(user.id),
-    user: { id: user.id, fullName: user.full_name, email: user.email, phone: user.phone },
+    token: signToken(user.id, user.role),
+    user: {
+      id: user.id,
+      fullName: user.full_name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role ?? 'member',
+    },
   });
 }
 
@@ -213,8 +230,14 @@ export async function resetPassword(req: Request, res: Response) {
   await Users.markEmailVerified(user.id);
 
   return res.json({
-    token: signToken(user.id),
-    user: { id: user.id, fullName: user.full_name, email: user.email, phone: user.phone },
+    token: signToken(user.id, user.role),
+    user: {
+      id: user.id,
+      fullName: user.full_name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role ?? 'member',
+    },
   });
 }
 
@@ -223,6 +246,12 @@ export async function me(req: Request, res: Response) {
   const user = await Users.findById(userId);
   if (!user) return res.status(404).json({ error: 'User not found' });
   return res.json({
-    user: { id: user.id, fullName: user.full_name, email: user.email, phone: user.phone },
+    user: {
+      id: user.id,
+      fullName: user.full_name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role ?? 'member',
+    },
   });
 }

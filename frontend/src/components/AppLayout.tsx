@@ -1,10 +1,10 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, Users, Wallet, Bell, Crown, User as UserIcon, LogOut } from 'lucide-react'
+import { LayoutDashboard, Users, Wallet, Bell, Crown, User as UserIcon, Shield, LogOut } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { cn } from '../utils/cn'
 import NotificationsListener from './NotificationsListener'
 
-const links = [
+const baseLinks = [
   { to: '/dashboard', label: 'Tableau de bord', short: 'Accueil', icon: LayoutDashboard },
   { to: '/groups', label: 'Groupes', short: 'Groupes', icon: Users },
   { to: '/payments', label: 'Paiements', short: 'Paiements', icon: Wallet },
@@ -13,10 +13,15 @@ const links = [
   { to: '/profile', label: 'Profil', short: 'Profil', icon: UserIcon },
 ]
 
+// Entrée Admin ajoutée uniquement pour les super_admin.
+const adminLink = { to: '/admin', label: 'Admin', short: 'Admin', icon: Shield }
+
 export default function AppLayout() {
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
   const logout = useAuthStore((s) => s.logout)
+
+  const links = user?.role === 'super_admin' ? [...baseLinks, adminLink] : baseLinks
 
   function onLogout() {
     logout()
@@ -78,7 +83,7 @@ export default function AppLayout() {
       {/* Barre de navigation inférieure : mobile uniquement (pattern application).
           Plus lisible que 6 icônes serrées dans le header. */}
       <nav className="sm:hidden fixed bottom-0 inset-x-0 z-30 border-t border-white/20 bg-white/80 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
-        <div className="grid grid-cols-6">
+        <div className={cn('grid', links.length === 7 ? 'grid-cols-7' : 'grid-cols-6')}>
           {links.map(({ to, short, icon: Icon }) => (
             <NavLink
               key={to}

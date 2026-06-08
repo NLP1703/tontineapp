@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
 
 import authRoutes from './routes/auth.js';
+import adminRoutes from './routes/admin.js';
 import { metricsMiddleware, metricsHandler } from './metrics.js';
 import { swaggerSpec } from './swagger.js';
 
@@ -20,6 +21,9 @@ export function createApp() {
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
   app.use('/api/auth', authRoutes);
+  // Routes d'administration (gestion users, audit, stats) — montées sous /api/auth.
+  // Le routeur applique lui-même requireAuth + requireRole(super_admin) + rate limit.
+  app.use('/api/auth', adminRoutes);
 
   return app;
 }
